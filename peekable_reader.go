@@ -5,6 +5,7 @@ import "io"
 type Peaker interface {
 	io.Reader
 	Peak(p []byte) (n int, err error)
+	PeakAtLeast(p []byte, min int) (n int, err error)
 }
 
 type peaker struct {
@@ -24,6 +25,15 @@ func (p *peaker) Peak(b []byte) (n int, err error) {
 	p.peak = make([]byte, n)
 	copy(p.peak, b)
 	return n, err
+}
+
+func (p *peaker) PeakAtLeast(b []byte, min int) (n int, err error) {
+	for {
+		nRead, err := p.Peak(b)
+		if nRead >= min || err != nil {
+			return nRead, err
+		}
+	}
 }
 
 func (p *peaker) Read(b []byte) (n int, err error) {
