@@ -1,10 +1,19 @@
 package io
 
 import (
-	"testing"
-	"strings"
-	"github.com/stretchr/testify/assert"
+	"bytes"
+	"compress/gzip"
 	"io"
+	"strings"
+	"testing"
+
+	"fmt"
+	"io/ioutil"
+
+	"encoding/base64"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestReadEmpty(t *testing.T) {
@@ -20,7 +29,7 @@ func TestReadPlain(t *testing.T) {
 	r := NewAnyReader(strings.NewReader(str))
 	b := make([]byte, len(str)+12)
 	n, err := r.Read(b)
-	assert.NoError(t,err)
+	assert.NoError(t, err)
 	assert.EqualValues(t, len(str), n)
 	assert.EqualValues(t, str, string(b[:n]))
 
@@ -45,5 +54,44 @@ func TestReadPlainShortReads(t *testing.T) {
 }
 
 func TestReadEmptyGZIP(t *testing.T) {
+	buff := new(bytes.Buffer)
+	gz := gzip.NewWriter(buff)
+	gz.Close()
 
+	r := NewAnyReader(buff)
+	b, err := ioutil.ReadAll(r)
+	require.NoError(t, err)
+	assert.Empty(t, b)
+}
+
+func TestReadGZIP(t *testing.T) {
+	buff := new(bytes.Buffer)
+	gz := gzip.NewWriter(buff)
+	fmt.Fprint(gz, "Hello World")
+	gz.Close()
+
+	r := NewAnyReader(buff)
+	b, err := ioutil.ReadAll(r)
+	require.NoError(t, err)
+	assert.EqualValues(t, "Hello World", string(b))
+}
+
+func TestReadXZ(t *testing.T) {
+	compressed := `/Td6WFoAAATm1rRGAgAhARYAAAB0L+WjAQAKSGVsbG8gV29ybGQAAMbNtcdndHQ+AAEjC8Ib/QkftvN9AQAAAAAEWVo=`
+	r := base64.NewDecoder(base64.StdEncoding, strings.NewReader(compressed))
+
+	r = NewAnyReader(r)
+	b, err := ioutil.ReadAll(r)
+	require.NoError(t, err)
+	assert.EqualValues(t, "Hello World", string(b))
+}
+
+func TestReadBZ2(t *testing.T) {
+	compressed := `QlpoOTFBWSZTWQZcidoAAACXgEAAAEAAgAYEkAAgADEMCCAxqRbEHUHi7kinChIAy5E7QA==`
+	r := base64.NewDecoder(base64.StdEncoding, strings.NewReader(compressed))
+
+	r = NewAnyReader(r)
+	b, err := ioutil.ReadAll(r)
+	require.NoError(t, err)
+	assert.EqualValues(t, "Hello World", string(b))
 }

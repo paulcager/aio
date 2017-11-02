@@ -6,9 +6,13 @@
 package io
 
 import (
+	"bufio"
+	"compress/bzip2"
 	"compress/gzip"
+	"compress/zlib"
 	"errors"
 	"io"
+	"os/exec"
 )
 
 var NotSupported = errors.New("The file type is not yet supported")
@@ -18,12 +22,17 @@ const (
 	gzipMagic     = "\x1f\x8b"
 	lzipMagic     = "LZIP"
 	bzip2Magic    = "BZh"
-	xzMagic       = "\x37\x7A\xBC\xAF\x27\x1C"
+	xzMagic       = "\xfd7zXZ\x00"
+	zlibMagic     = "\x78\x9c"
 )
 
 type anyReader struct {
 	r       io.Reader
 	decided bool
+}
+
+func NewAnyReader(r io.Reader) *anyReader {
+	return &anyReader{r: r}
 }
 
 func (r *anyReader) Read(b []byte) (n int, err error) {
@@ -37,33 +46,54 @@ func (r *anyReader) Read(b []byte) (n int, err error) {
 	return r.r.Read(b)
 }
 
-//	p.peak = p.peak[n:]
-func NewAnyReader(r io.Reader) *anyReader {
-	return &anyReader{r: r}
-}
-
 func (r *anyReader) decide() error {
 	var err error
 	if r.decided {
 		return nil
 	}
 
-	peaker := NewPeakableReader(r.r)
-	r.r = peaker
-	b := make([]byte, 512)
+	peeker := bufio.NewReader(r.r)
+	r.r = peeker
 	r.decided = true
 
-	if n, _ := peaker.PeakAtLeast(b, 2); n == 2 && string(b[:2]) == string([]byte{0x1f, 0x9d}) {
+	if b, err := peeker.Peek(len(compressMagic)); err == nil && string(b) == compressMagic {
 		// "compress" format. https://en.wikipedia.org/wiki/Lempel-Ziv-Welch
 		return NotSupported
-	} else if n, _ := peaker.PeakAtLeast(b, len(gzipMagic)); n == len(gzipMagic) && string(b[:len(gzipMagic)]) == gzipMagic {
+	} else if b, err := peeker.Peek(len(gzipMagic)); err == nil && string(b) == gzipMagic {
 		// "gzip" format. https://tools.ietf.org/html/rfc1952
 		r.r, err = gzip.NewReader(r.r)
-	} else if n, _ := peaker.PeakAtLeast(b, 4); n == 4 && string(b[:4]) == string("LZIP") {
+	} else if b, err := peeker.Peek(len(bzip2Magic)); err == nil && string(b) == bzip2Magic {
+		// "bz2" format.
+		r.r = bzip2.NewReader(r.r)
+	} else if b, err := peeker.Peek(len(zlibMagic)); err == nil && string(b) == zlibMagic {
+		// "zlib" RFC 1950
+		r.r, err = zlib.NewReader(r.r)
+	} else if b, err := peeker.Peek(len(lzipMagic)); err == nil && string(b) == lzipMagic {
 		return NotSupported
+	} else if b, err := peeker.Peek(len(xzMagic)); err == nil && string(b) == xzMagic {
+		r.r = NewXZReader(r.r)
+	} else {
+		// It is not a known format. Assume no compression.
 	}
 
-	// It is not a known format. Assume no compression.
-
 	return err
+}
+
+// NewXZReader creates a reader that decompresses the `xz` format input.
+// Note that for convenience this is done by piping the input through an invocation
+// of the `xz` command. Other decompression methods would be possible, such as pure
+// Go implementations of xz, or a CGO wrapper around libxz.
+func NewXZReader(r io.Reader) io.Reader {
+	rpipe, wpipe := io.Pipe()
+
+	cmd := exec.Command("xz", "--decompress", "--stdout")
+	cmd.Stdin = r
+	cmd.Stdout = wpipe
+
+	go func() {
+		err := cmd.Run()
+		wpipe.CloseWithError(err)
+	}()
+
+	return rpipe
 }
