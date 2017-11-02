@@ -13,6 +13,8 @@ import (
 	"errors"
 	"io"
 	"os/exec"
+
+	"github.com/pierrec/lz4"
 )
 
 var NotSupported = errors.New("The file type is not yet supported")
@@ -24,6 +26,7 @@ const (
 	bzip2Magic    = "BZh"
 	xzMagic       = "\xfd7zXZ\x00"
 	zlibMagic     = "\x78\x9c"
+	lz4Magic      = "\x04\x22\x4d\x18"
 )
 
 type anyReader struct {
@@ -70,6 +73,8 @@ func (r *anyReader) decide() error {
 		r.r, err = zlib.NewReader(r.r)
 	} else if b, err := peeker.Peek(len(lzipMagic)); err == nil && string(b) == lzipMagic {
 		return NotSupported
+	} else if b, err := peeker.Peek(len(lz4Magic)); err == nil && string(b) == lz4Magic {
+		r.r = lz4.NewReader(r.r)
 	} else if b, err := peeker.Peek(len(xzMagic)); err == nil && string(b) == xzMagic {
 		r.r = NewXZReader(r.r)
 	} else {
