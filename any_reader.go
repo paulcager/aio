@@ -3,7 +3,7 @@
 
 // ZIP files / tar files - return concat of all contained files.
 
-package io
+package aio
 
 import (
 	"bufio"
@@ -12,6 +12,7 @@ import (
 	"compress/zlib"
 	"errors"
 	"io"
+	"os"
 	"os/exec"
 
 	"github.com/pierrec/lz4"
@@ -29,16 +30,16 @@ const (
 	lz4Magic      = "\x04\x22\x4d\x18"
 )
 
-type anyReader struct {
+type AnyReader struct {
 	r       io.Reader
 	decided bool
 }
 
-func NewAnyReader(r io.Reader) *anyReader {
-	return &anyReader{r: r}
+func NewReader(r io.Reader) *AnyReader {
+	return &AnyReader{r: r}
 }
 
-func (r *anyReader) Read(b []byte) (n int, err error) {
+func (r *AnyReader) Read(b []byte) (n int, err error) {
 	if !r.decided {
 		err = r.decide()
 		if err != nil {
@@ -49,7 +50,7 @@ func (r *anyReader) Read(b []byte) (n int, err error) {
 	return r.r.Read(b)
 }
 
-func (r *anyReader) decide() error {
+func (r *AnyReader) decide() error {
 	var err error
 	if r.decided {
 		return nil
@@ -92,6 +93,23 @@ func NewXZReader(r io.Reader) io.Reader {
 	rpipe, wpipe := io.Pipe()
 
 	cmd := exec.Command("xz", "--decompress", "--stdout")
+	cmd.Stdin = r
+	cmd.Stdout = wpipe
+	cmd.Stderr = os.Stderr
+
+	go func() {
+		err := cmd.Run()
+		wpipe.CloseWithError(err)
+	}()
+
+	return rpipe
+}
+
+func NewGZIPReader(r io.Reader) io.Reader {
+	rpipe, wpipe := io.Pipe()
+
+	cmd := exec.Command("zcat")
+	cmd.Stderr = os.Stderr
 	cmd.Stdin = r
 	cmd.Stdout = wpipe
 

@@ -1,24 +1,24 @@
-package io
+package aio
 
 import (
-	"io"
 	"archive/zip"
+	"io"
 )
 
 type ZipFlattener struct {
 	r        *zip.ReadCloser
-	err error
+	err      error
 	files    []*zip.File
 	currFile io.ReadCloser
 }
 
 func (z *ZipFlattener) Close() error {
-	z.err =io.ErrClosedPipe
+	z.err = io.ErrClosedPipe
 	return z.Close()
 }
 
 func (z *ZipFlattener) Read(p []byte) (n int, err error) {
-	if z.err != nil{
+	if z.err != nil {
 		return 0, err
 	}
 	for {

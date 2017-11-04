@@ -1,4 +1,4 @@
-package io
+package aio
 
 import (
 	"io/ioutil"
