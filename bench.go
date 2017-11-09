@@ -9,6 +9,8 @@ import (
 	"os"
 	"time"
 
+	"compress/bzip2"
+
 	"github.com/paulcager/aio"
 	"github.com/ulikunitz/xz"
 )
@@ -20,7 +22,8 @@ func main() {
 	BenchmarkPipe(testFile+".gz", "zcat")
 	BenchmarkGoXZ()
 	BenchmarkPipe(testFile+".xz", "xzcat")
-
+	BenchmarkGoBZ2()
+	BenchmarkPipe(testFile+".bz2", "bzip2")
 }
 
 func BenchmarkGoGZIP() {
@@ -45,7 +48,54 @@ func BenchmarkGoGZIP() {
 			break
 		}
 	}
-	fmt.Println("Go", cnt, time.Since(start))
+	fmt.Println("Go gz", cnt, time.Since(start))
+}
+
+func BenchmarkGoXZ() {
+	start := time.Now()
+	r, err := os.Open(testFile + ".xz")
+	if err != nil {
+		panic(err)
+	}
+	defer r.Close()
+
+	gr, err := xz.NewReader(r)
+	if err != nil {
+		panic(err)
+	}
+
+	buff := make([]byte, 2048)
+	cnt := 0
+	for {
+		n, err := gr.Read(buff)
+		cnt = cnt + n
+		if err != nil {
+			break
+		}
+	}
+	fmt.Println("Go xz", cnt, time.Since(start))
+}
+
+func BenchmarkGoBZ2() {
+	start := time.Now()
+	r, err := os.Open(testFile + ".bz2")
+	if err != nil {
+		panic(err)
+	}
+	defer r.Close()
+
+	gr := bzip2.NewReader(r)
+
+	buff := make([]byte, 2048)
+	cnt := 0
+	for {
+		n, err := gr.Read(buff)
+		cnt = cnt + n
+		if err != nil {
+			break
+		}
+	}
+	fmt.Println("Go bz2", cnt, time.Since(start))
 }
 
 func BenchmarkPipe(file string, cmd string) {
@@ -71,29 +121,4 @@ func BenchmarkPipe(file string, cmd string) {
 		}
 	}
 	fmt.Println("pipe", cnt, time.Since(start))
-}
-
-func BenchmarkGoXZ() {
-	start := time.Now()
-	r, err := os.Open(testFile + ".xz")
-	if err != nil {
-		panic(err)
-	}
-	defer r.Close()
-
-	gr, err := xz.NewReader(r)
-	if err != nil {
-		panic(err)
-	}
-
-	buff := make([]byte, 2048)
-	cnt := 0
-	for {
-		n, err := gr.Read(buff)
-		cnt = cnt + n
-		if err != nil {
-			break
-		}
-	}
-	fmt.Println("Go", cnt, time.Since(start))
 }
