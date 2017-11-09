@@ -23,7 +23,7 @@ func main() {
 	BenchmarkGoXZ()
 	BenchmarkPipe(testFile+".xz", "xzcat")
 	BenchmarkGoBZ2()
-	BenchmarkPipe(testFile+".bz2", "bzip2")
+	BenchmarkPipe(testFile+".bz2", "bzcat")
 }
 
 func BenchmarkGoGZIP() {
