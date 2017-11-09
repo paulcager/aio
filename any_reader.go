@@ -90,25 +90,18 @@ func (r *AnyReader) decide() error {
 // of the `xz` command. Other decompression methods would be possible, such as pure
 // Go implementations of xz, or a CGO wrapper around libxz.
 func NewXZReader(r io.Reader) io.Reader {
-	rpipe, wpipe := io.Pipe()
-
-	cmd := exec.Command("xz", "--decompress", "--stdout")
-	cmd.Stdin = r
-	cmd.Stdout = wpipe
-	cmd.Stderr = os.Stderr
-
-	go func() {
-		err := cmd.Run()
-		wpipe.CloseWithError(err)
-	}()
-
-	return rpipe
+	return NewPipeReader(r, "xzcat")
 }
 
 func NewGZIPReader(r io.Reader) io.Reader {
+	return NewPipeReader(r, "zcat")
+}
+
+// TODO implement io.ReadCloser
+func NewPipeReader(r io.Reader, cmdName string, args ...string) io.Reader {
 	rpipe, wpipe := io.Pipe()
 
-	cmd := exec.Command("zcat")
+	cmd := exec.Command(cmdName, args...)
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = r
 	cmd.Stdout = wpipe
