@@ -3,13 +3,12 @@
 package main
 
 import (
+	"compress/bzip2"
 	"compress/gzip"
 	"fmt"
 	"io"
 	"os"
 	"time"
-
-	"compress/bzip2"
 
 	"github.com/paulcager/aio"
 	"github.com/ulikunitz/xz"
