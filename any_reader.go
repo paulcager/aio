@@ -87,8 +87,7 @@ func (r *AnyReader) decide() error {
 
 // NewXZReader creates a reader that decompresses the `xz` format input.
 // Note that for convenience this is done by piping the input through an invocation
-// of the `xz` command. Other decompression methods would be possible, such as pure
-// Go implementations of xz, or a CGO wrapper around libxz.
+// of the `xz` command.
 func NewXZReader(r io.Reader) io.Reader {
 	return NewPipeReader(r, "xzcat")
 }
@@ -97,8 +96,7 @@ func NewGZIPReader(r io.Reader) io.Reader {
 	return NewPipeReader(r, "zcat")
 }
 
-// TODO implement io.ReadCloser
-func NewPipeReader(r io.Reader, cmdName string, args ...string) io.Reader {
+func NewPipeReader(r io.Reader, cmdName string, args ...string) io.ReadCloser {
 	rpipe, wpipe := io.Pipe()
 
 	cmd := exec.Command(cmdName, args...)
